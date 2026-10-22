@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escaner de Inventario - Taller</title>
+    <!-- Libreria para escanear con la camara -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- Libreria JsBarcode para generar codigo de barras visual -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1, h2 { text-align: center; color: #0f172a; }
+        .card {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            font-size: 15px;
+        }
+        button:hover { opacity: 0.9; }
+        .btn-scan { background: #0f172a; color: white; width: 100%; }
+        .btn-in { background: var(--success); color: white; }
+        .btn-out { background: var(--danger); color: white; }
+        .btn-primary { background: var(--primary); color: white; width: 100%; margin-top: 10px; }
+        
+        #reader {
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+
+        .barcode-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .barcode-box svg {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th { background: #f1f5f9; }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+            z-index: 100;
+        }
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0 20px 0;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        .ticket {
+            background: #fffbeb;
+            border: 1px dashed #f59e0b;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            margin-top: 15px;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📦 Escaner de Inventario</h1>
+
+    <!-- Tarjeta con los Codigos de Barras Generados para Pruebas -->
+    <div class="card">
+        <h3>Codigos de Barras de Prueba</h3>
+        <p style="font-size: 13px; color: #64748b; text-align: center;">Apunta con la camara de tu celular directamente a estos codigos en la pantalla de tu PC:</p>
+        
+        <div class="barcode-box">
+            <strong>0001 - Tubos perchero</strong><br>
+            <svg id="barcode-0001"></svg>
+        </div>
+
+        <div class="barcode-box">
+            <strong>0002 - Bisagras</strong><br>
+            <svg id="barcode-0002"></svg>
+        </div>
+
+        <div class="barcode-box">
+            <strong>0003 - LED</strong><br>
+            <svg id="barcode-0003"></svg>
+        </div>
+    </div>
+
+    <!-- Tarjeta de la Camara -->
+    <div class="card">
+        <h3>Escanear con Camara Real</h3>
+        <button id="btn-activar-camara" class="btn-scan" onclick="iniciarEscanner()">📷 Activar Camara</button>
+        <div id="reader" class="hidden"></div>
+    </div>
+
+    <!-- Base de datos / Tabla actual -->
+    <div class="card">
+        <h3>Base de Datos Actual</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Codigo</th>
+                    <th>Articulo</th>
+                    <th>Stock</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-inventario">
+                <!-- Se llena dinamicamente -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Ultimo Ticket Generado -->
+    <div id="contenedor-ticket" class="card hidden">
+        <h3>Ticket de Salida Reciente</h3>
+        <div id="ticket-detalle" class="ticket"></div>
+        <button class="btn-scan" style="margin-top:10px; background:#475569;" onclick="ocultarTicket()">Cerrar Ticket</button>
+    </div>
+</div>
+
+<!-- Modal de Accion (Ingresar / Retirar) -->
+<div id="modal-accion" class="modal">
+    <div class="modal-content">
+        <h3 id="modal-titulo">Operacion</h3>
+        <p id="modal-producto" style="font-weight: bold; color: var(--primary);"></p>
+        
+        <label>Cantidad:</label>
+        <input type="number" id="input-cantidad" min="1" value="1">
+
+        <button id="btn-ejecutar" class="btn-primary" onclick="ejecutarMovimiento()">Confirmar</button>
+        <button class="btn-scan" style="margin-top:8px; background:#cbd5e1; color:#334155;" onclick="cerrarModal()">Cancelar</button>
+    </div>
+</div>
+
+<script>
+    // Generar visualmente los codigos de barras al cargar la pagina usando JsBarcode
+    window.onload = function() {
+        JsBarcode("#barcode-0001", "0001", { format: "CODE128", width: 2, height: 50, displayValue: true });
+        JsBarcode("#barcode-0002", "0002", { format: "CODE128", width: 2, height: 50, displayValue: true });
+        JsBarcode("#barcode-0003", "0003", { format: "CODE128", width: 2, height: 50, displayValue: true });
+        actualizarTabla();
+    };
+
+    // Base de datos de prueba
+    let inventario = {
+        "0001": { nombre: "Tubos perchero", stock: 25 },
+        "0002": { nombre: "Bisagras", stock: 120 },
+        "0003": { nombre: "LED", stock: 45 }
+    };
+
+    let itemActual = null;
+    let tipoOperacion = null;
+    let html5QrCode = null;
+
+    function actualizarTabla() {
+        const tabla = document.getElementById('tabla-inventario');
+        tabla.innerHTML = '';
+        for (let codigo in inventario) {
+            tabla.innerHTML += `
+                <tr>
+                    <td><code>${codigo}</code></td>
+                    <td>${inventario[codigo].nombre}</td>
+                    <td><strong>${inventario[codigo].stock}</strong></td>
+                </tr>
+            `;
+        }
+    }
+
+    // Iniciar la camara con Html5Qrcode
+    function iniciarEscanner() {
+        const readerDiv = document.getElementById('reader');
+        readerDiv.classList.remove('hidden');
+        document.getElementById('btn-activar-camara').classList.add('hidden');
+
+        html5QrCode = new Html5Qrcode("reader");
+        
+        const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+
+        html5QrCode.start(
+            { facingMode: "environment" }, // Usa la camara trasera del celular
+            config,
+            (decodedText) => {
+                // Codigo escaneado con exito
+                manejarCodigoDetectado(decodedText);
+            },
+            (errorMessage) => {
+                // Errores de escaneo continuo (se ignoran para que la app no falle mientras busca)
+            }
+        ).catch(err => {
+            alert("No se pudo acceder a la camara. Asegurate de dar permisos o usar HTTPS / Localhost.");
+            detenerEscanner();
+        });
+    }
+
+    function detenerEscanner() {
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => {
+                document.getElementById('reader').classList.add('hidden');
+                document.getElementById('btn-activar-camara').classList.remove('hidden');
+            }).catch(err => console.log(err));
+        }
+    }
+
+    function manejarCodigoDetectado(codigo) {
+        codigo = codigo.trim();
+
+        if (!inventario[codigo]) {
+            alert(`Codigo escaneado: "${codigo}" no esta registrado en la base de datos.`);
+            return;
+        }
+
+        detenerEscanner();
+
+        itemActual = codigo;
+        let item = inventario[codigo];
+
+        let accion = prompt(`¡Articulo detectado!\nNombre: ${item.nombre}\nStock actual: ${item.stock}\n\n¿Que deseas hacer?\n1. Ingresar stock\n2. Retirar stock`, "1");
+
+        if (accion === "1") {
+            abrirModal('in');
+        } else if (accion === "2") {
+            abrirModal('out');
+        }
+    }
+
+    function abrirModal(tipo) {
+        tipoOperacion = tipo;
+        const item = inventario[itemActual];
+        document.getElementById('modal-titulo').innerText = tipo === 'in' ? '📥 Ingresar al Inventario' : '📤 Retirar del Inventario';
+        document.getElementById('modal-producto').innerText = `${item.nombre} (Codigo: ${itemActual})`;
+        document.getElementById('input-cantidad').value = 1;
+        
+        const btn = document.getElementById('btn-ejecutar');
+        btn.className = tipo === 'in' ? 'btn-primary btn-in' : 'btn-primary btn-out';
+        btn.innerText = tipo === 'in' ? 'Guardar Ingreso' : 'Registrar Retiro';
+
+        document.getElementById('modal-accion').style.display = 'flex';
+    }
+
+    function cerrarModal() {
+        document.getElementById('modal-accion').style.display = 'none';
+    }
+
+    function ejecutarMovimiento() {
+        let cantidad = parseInt(document.getElementById('input-cantidad').value);
+        if (isNaN(cantidad) || cantidad <= 0) {
+            alert("Por favor ingresa una cantidad valida.");
+            return;
+        }
+
+        let item = inventario[itemActual];
+
+        if (tipoOperacion === 'in') {
+            item.stock += cantidad;
+            alert(`Se ingresaron ${cantidad} unidades de ${item.nombre}.`);
+            cerrarModal();
+            actualizarTabla();
+        } else {
+            if (cantidad > item.stock) {
+                alert("Error: No hay suficiente stock disponible para retirar esa cantidad.");
+                return;
+            }
+            item.stock -= cantidad;
+            cerrarModal();
+            actualizarTabla();
+            generarTicket(item.nombre, cantidad, item.stock);
+        }
+    }
+
+    function generarTicket(nombre, cantidad, stockRestante) {
+        const fecha = new Date().toLocaleString();
+        const ticketHtml = `
+            <strong>TICKET DE SALIDA DE MATERIAL</strong><br>
+            ----------------------------------------<br>
+            <strong>Fecha/Hora:</strong> ${fecha}<br>
+            <strong>Articulo:</strong> ${nombre}<br>
+            <strong>Cantidad Retirada:</strong> -${cantidad} unidades<br>
+            <strong>Stock Restante:</strong> ${stockRestante} unidades<br>
+            ----------------------------------------<br>
+            <span style="font-size: 11px; color: #64748b;">Estado: Retiro autorizado</span>
+        `;
+        document.getElementById('ticket-detalle').innerHTML = ticketHtml;
+        document.getElementById('contenedor-ticket').classList.remove('hidden');
+    }
+
+    function ocultarTicket() {
+        document.getElementById('contenedor-ticket').classList.add('hidden');
+    }
+</script>
+
+</body>
+</html>
