@@ -47,8 +47,8 @@
         }
         button:hover { opacity: 0.9; }
         .btn-scan { background: #0f172a; color: white; width: 100%; }
-        .btn-in { background: var(--success); color: white; }
-        .btn-out { background: var(--danger); color: white; }
+        .btn-in { background: var(--success); color: white; width: 100%; margin-bottom: 10px; }
+        .btn-out { background: var(--danger); color: white; width: 100%; }
         .btn-primary { background: var(--primary); color: white; width: 100%; margin-top: 10px; }
         
         #reader {
@@ -100,6 +100,7 @@
             border-radius: 12px;
             width: 100%;
             max-width: 400px;
+            text-align: center;
         }
         input {
             width: 100%;
@@ -109,6 +110,7 @@
             border-radius: 6px;
             box-sizing: border-box;
             font-size: 16px;
+            text-align: center;
         }
         .ticket {
             background: #fffbeb;
@@ -117,6 +119,18 @@
             border-radius: 8px;
             font-family: monospace;
             margin-top: 15px;
+            text-align: left;
+        }
+        .ticket-modal-content {
+            background: #fffbeb;
+            border: 2px dashed #f59e0b;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 450px;
+            font-family: monospace;
+            text-align: left;
+            position: relative;
         }
         .hidden { display: none !important; }
     </style>
@@ -126,21 +140,19 @@
 <div class="container">
     <h1>📦 Escaner de Inventario</h1>
 
-    <!-- Tarjeta con los Codigos de Barras Generados para Pruebas -->
+    <!-- Codigos de Barras de Prueba -->
     <div class="card">
         <h3>Codigos de Barras de Prueba</h3>
-        <p style="font-size: 13px; color: #64748b; text-align: center;">Apunta con la camara de tu celular directamente a estos codigos en la pantalla de tu PC:</p>
+        <p style="font-size: 13px; color: #64748b; text-align: center;">Apunta con la camara de tu celular a estos codigos:</p>
         
         <div class="barcode-box">
             <strong>0001 - Tubos perchero</strong><br>
             <svg id="barcode-0001"></svg>
         </div>
-
         <div class="barcode-box">
             <strong>0002 - Bisagras</strong><br>
             <svg id="barcode-0002"></svg>
         </div>
-
         <div class="barcode-box">
             <strong>0003 - LED</strong><br>
             <svg id="barcode-0003"></svg>
@@ -154,6 +166,13 @@
         <div id="reader" class="hidden"></div>
     </div>
 
+    <!-- Ticket Acumulativo Actual -->
+    <div id="contenedor-ticket-activo" class="card hidden" style="border: 2px solid #f59e0b;">
+        <h3>📋 Ticket Acumulativo en Proceso</h3>
+        <div id="detalle-acumulado" class="ticket"></div>
+        <button class="btn-scan" style="margin-top:10px; background:var(--success);" onclick="cerrarTicketAcumulado()">✅ Hacer Cierre de Ticket</button>
+    </div>
+
     <!-- Base de datos / Tabla actual -->
     <div class="card">
         <h3>Base de Datos Actual</h3>
@@ -165,36 +184,48 @@
                     <th>Stock</th>
                 </tr>
             </thead>
-            <tbody id="tabla-inventario">
-                <!-- Se llena dinamicamente -->
-            </tbody>
+            <tbody id="tabla-inventario"></tbody>
         </table>
-    </div>
-
-    <!-- Ultimo Ticket Generado -->
-    <div id="contenedor-ticket" class="card hidden">
-        <h3>Ticket de Salida Reciente</h3>
-        <div id="ticket-detalle" class="ticket"></div>
-        <button class="btn-scan" style="margin-top:10px; background:#475569;" onclick="ocultarTicket()">Cerrar Ticket</button>
     </div>
 </div>
 
-<!-- Modal de Accion (Ingresar / Retirar) -->
-<div id="modal-accion" class="modal">
+<!-- Modal de Menu de Accion -->
+<div id="modal-menu" class="modal">
     <div class="modal-content">
-        <h3 id="modal-titulo">Operacion</h3>
-        <p id="modal-producto" style="font-weight: bold; color: var(--primary);"></p>
+        <h3>Articulo Detectado</h3>
+        <p id="menu-producto" style="font-weight: bold; color: var(--primary); font-size: 18px;"></p>
+        <p id="menu-stock" style="color: #64748b; font-size: 14px; margin-bottom: 20px;"></p>
         
-        <label>Cantidad:</label>
+        <button class="btn-in" onclick="seleccionarAccion('in')">📥 Ingresar Stock</button>
+        <button class="btn-out" onclick="seleccionarAccion('out')">📤 Retirar Stock</button>
+        <button class="btn-scan" style="margin-top: 10px; background: #cbd5e1; color: #334155;" onclick="cerrarModalMenu()">Cancelar</button>
+    </div>
+</div>
+
+<!-- Modal de Cantidad -->
+<div id="modal-cantidad" class="modal">
+    <div class="modal-content">
+        <h3 id="cantidad-titulo">Operacion</h3>
+        <p id="cantidad-producto" style="font-weight: bold; color: var(--primary);"></p>
+        
+        <label>Ingresa la cantidad:</label>
         <input type="number" id="input-cantidad" min="1" value="1">
 
         <button id="btn-ejecutar" class="btn-primary" onclick="ejecutarMovimiento()">Confirmar</button>
-        <button class="btn-scan" style="margin-top:8px; background:#cbd5e1; color:#334155;" onclick="cerrarModal()">Cancelar</button>
+        <button class="btn-scan" style="margin-top:8px; background:#cbd5e1; color:#334155;" onclick="regresarAMenu()">Regresar</button>
+    </div>
+</div>
+
+<!-- Modal de Ticket en Grande (Pantalla Completa) -->
+<div id="modal-ticket-grande" class="modal">
+    <div class="ticket-modal-content">
+        <h2 style="margin-top:0; color:#b45309; text-align:center;">TICKET CERRADO</h2>
+        <div id="ticket-grande-detalle"></div>
+        <button class="btn-scan" style="margin-top:20px; background:#334155;" onclick="ocultarTicketGrande()">Cerrar Ventana</button>
     </div>
 </div>
 
 <script>
-    // Generar visualmente los codigos de barras al cargar la pagina usando JsBarcode
     window.onload = function() {
         JsBarcode("#barcode-0001", "0001", { format: "CODE128", width: 2, height: 50, displayValue: true });
         JsBarcode("#barcode-0002", "0002", { format: "CODE128", width: 2, height: 50, displayValue: true });
@@ -202,7 +233,6 @@
         actualizarTabla();
     };
 
-    // Base de datos de prueba
     let inventario = {
         "0001": { nombre: "Tubos perchero", stock: 25 },
         "0002": { nombre: "Bisagras", stock: 120 },
@@ -212,6 +242,9 @@
     let itemActual = null;
     let tipoOperacion = null;
     let html5QrCode = null;
+    
+    // Lista acumulativa de salidas para el ticket actual
+    let listaRetirosAcumulados = [];
 
     function actualizarTabla() {
         const tabla = document.getElementById('tabla-inventario');
@@ -227,28 +260,23 @@
         }
     }
 
-    // Iniciar la camara con Html5Qrcode
     function iniciarEscanner() {
         const readerDiv = document.getElementById('reader');
         readerDiv.classList.remove('hidden');
         document.getElementById('btn-activar-camara').classList.add('hidden');
 
         html5QrCode = new Html5Qrcode("reader");
-        
         const config = { fps: 10, qrbox: { width: 250, height: 150 } };
 
         html5QrCode.start(
-            { facingMode: "environment" }, // Usa la camara trasera del celular
+            { facingMode: "environment" },
             config,
             (decodedText) => {
-                // Codigo escaneado con exito
                 manejarCodigoDetectado(decodedText);
             },
-            (errorMessage) => {
-                // Errores de escaneo continuo (se ignoran para que la app no falle mientras busca)
-            }
+            (errorMessage) => {}
         ).catch(err => {
-            alert("No se pudo acceder a la camara. Asegurate de dar permisos o usar HTTPS / Localhost.");
+            alert("No se pudo acceder a la camara.");
             detenerEscanner();
         });
     }
@@ -266,40 +294,43 @@
         codigo = codigo.trim();
 
         if (!inventario[codigo]) {
-            alert(`Codigo escaneado: "${codigo}" no esta registrado en la base de datos.`);
+            alert(`Codigo escaneado: "${codigo}" no esta registrado.`);
             return;
         }
 
         detenerEscanner();
-
         itemActual = codigo;
         let item = inventario[codigo];
 
-        let accion = prompt(`¡Articulo detectado!\nNombre: ${item.nombre}\nStock actual: ${item.stock}\n\n¿Que deseas hacer?\n1. Ingresar stock\n2. Retirar stock`, "1");
-
-        if (accion === "1") {
-            abrirModal('in');
-        } else if (accion === "2") {
-            abrirModal('out');
-        }
+        document.getElementById('menu-producto').innerText = item.nombre;
+        document.getElementById('menu-stock').innerText = `Stock actual: ${item.stock} unidades (Codigo: ${codigo})`;
+        document.getElementById('modal-menu').style.display = 'flex';
     }
 
-    function abrirModal(tipo) {
+    function cerrarModalMenu() {
+        document.getElementById('modal-menu').style.display = 'none';
+    }
+
+    function seleccionarAccion(tipo) {
         tipoOperacion = tipo;
+        document.getElementById('modal-menu').style.display = 'none';
+
         const item = inventario[itemActual];
-        document.getElementById('modal-titulo').innerText = tipo === 'in' ? '📥 Ingresar al Inventario' : '📤 Retirar del Inventario';
-        document.getElementById('modal-producto').innerText = `${item.nombre} (Codigo: ${itemActual})`;
+        document.getElementById('cantidad-titulo').innerText = tipo === 'in' ? '📥 Ingresar al Inventario' : '📤 Retirar del Inventario';
+        document.getElementById('cantidad-producto').innerText = `${item.nombre}`;
         document.getElementById('input-cantidad').value = 1;
-        
+
         const btn = document.getElementById('btn-ejecutar');
         btn.className = tipo === 'in' ? 'btn-primary btn-in' : 'btn-primary btn-out';
         btn.innerText = tipo === 'in' ? 'Guardar Ingreso' : 'Registrar Retiro';
 
-        document.getElementById('modal-accion').style.display = 'flex';
+        document.getElementById('modal-cantidad').style.display = 'flex';
     }
 
-    function cerrarModal() {
-        document.getElementById('modal-accion').style.display = 'none';
+    function regresarAMenu() {
+        document.getElementById('modal-cantidad').style.display = 'none';
+        const item = inventario[itemActual];
+        document.getElementById('modal-menu').style.display = 'flex';
     }
 
     function ejecutarMovimiento() {
@@ -314,7 +345,7 @@
         if (tipoOperacion === 'in') {
             item.stock += cantidad;
             alert(`Se ingresaron ${cantidad} unidades de ${item.nombre}.`);
-            cerrarModal();
+            document.getElementById('modal-cantidad').style.display = 'none';
             actualizarTabla();
         } else {
             if (cantidad > item.stock) {
@@ -322,30 +353,63 @@
                 return;
             }
             item.stock -= cantidad;
-            cerrarModal();
+            document.getElementById('modal-cantidad').style.display = 'none';
             actualizarTabla();
-            generarTicket(item.nombre, cantidad, item.stock);
+            
+            // Acumular retiro en la lista del ticket actual
+            listaRetirosAcumulados.push({
+                nombre: item.nombre,
+                cantidad: cantidad,
+                stockRestante: item.stock
+            });
+
+            actualizarTicketActivo();
         }
     }
 
-    function generarTicket(nombre, cantidad, stockRestante) {
-        const fecha = new Date().toLocaleString();
-        const ticketHtml = `
-            <strong>TICKET DE SALIDA DE MATERIAL</strong><br>
-            ----------------------------------------<br>
-            <strong>Fecha/Hora:</strong> ${fecha}<br>
-            <strong>Articulo:</strong> ${nombre}<br>
-            <strong>Cantidad Retirada:</strong> -${cantidad} unidades<br>
-            <strong>Stock Restante:</strong> ${stockRestante} unidades<br>
-            ----------------------------------------<br>
-            <span style="font-size: 11px; color: #64748b;">Estado: Retiro autorizado</span>
-        `;
-        document.getElementById('ticket-detalle').innerHTML = ticketHtml;
-        document.getElementById('contenedor-ticket').classList.remove('hidden');
+    function actualizarTicketActivo() {
+        let html = `<strong>Fecha/Hora inicio:</strong> ${new Date().toLocaleString()}<br>`;
+        html += `----------------------------------------<br>`;
+        html += `<strong>Articulos retirados:</strong><br>`;
+        
+        listaRetirosAcumuladosforEachSafe = listaRetirosAcumulados.forEach((el, index) => {
+            html += `${index + 1}. ${el.nombre} -> <strong>-${el.cantidad}</strong> (Restan: ${el.stockRestante})<br>`;
+        });
+
+        html += `----------------------------------------<br>`;
+        html += `<span style="font-size: 12px; color: #b45309;">Estado: Acumulando salidas...</span>`;
+
+        document.getElementById('detalle-acumulado').innerHTML = html;
+        document.getElementById('contenedor-ticket-activo').classList.remove('hidden');
     }
 
-    function ocultarTicket() {
-        document.getElementById('contenedor-ticket').classList.add('hidden');
+    function cerrarTicketAcumulado() {
+        if (listaRetirosAcumulados.length === 0) return;
+
+        let fechaCierre = new Date().toLocaleString();
+        let htmlGrande = `<strong>TICKET DE SALIDA - OFICIAL</strong><br>`;
+        htmlGrande += `----------------------------------------<br>`;
+        htmlGrande += `<strong>Cierre:</strong> ${fechaCierre}<br>`;
+        htmlGrande += `----------------------------------------<br>`;
+        
+        listaRetirosAcumulados.forEach((el, index) => {
+            htmlGrande += `${index + 1}. ${el.nombre}<br>&nbsp;&nbsp;&nbsp;&nbsp;Cantidad: <strong>-${el.cantidad}</strong> | Stock final: ${el.stockRestante}<br>`;
+        });
+
+        htmlGrande += `----------------------------------------<br>`;
+        htmlGrande += `<strong>Firma autorizada:</strong> Taller<br>`;
+        htmlGrande += `<span style="font-size: 11px; color: #16a34a;">✔ Cierre de ticket completado con exito</span>`;
+
+        document.getElementById('ticket-grande-detalle').innerHTML = htmlGrande;
+        document.getElementById('modal-ticket-grande').style.display = 'flex';
+
+        // Limpiar acumulador y ocultar panel activo
+        listaRetirosAcumulados = [];
+        document.getElementById('contenedor-ticket-activo').classList.add('hidden');
+    }
+
+    function ocultarTicketGrande() {
+        document.getElementById('modal-ticket-grande').style.display = 'none';
     }
 </script>
 
